@@ -1,0 +1,930 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>太陽系シミュレーター｜惑星と彗星の軌道を今日の日付で眺める無料ブラウザシミュレーター</title>
+<meta name="description" content="八つの惑星と七つの彗星の軌道を、太陽の北側から見て動かせるブラウザ用シミュレーター。速さを変えて時間を進めたり戻したりでき、天体ごとの距離や公転周期、地球を選ぶと月の満ち欠けと月齢も表示。今日の惑星の配置はスマホ壁紙として保存できます。PC・スマホ対応、インストール不要・無料です。">
+<link rel="canonical" href="https://itsukiaida.github.io/solar-system-simulator/">
+<meta name="robots" content="index, follow">
+<meta name="theme-color" content="#060a13">
+<meta name="google-site-verification" content="fKrBuff_rTne9gJJHi83a1yGWmYiQ3_LFzbGBx9xjL0">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="太陽系シミュレーター">
+<meta property="og:title" content="太陽系シミュレーター｜惑星と彗星を今日の日付で眺める">
+<meta property="og:description" content="八つの惑星と七つの彗星を動かして眺めるブラウザ用シミュレーター。月の満ち欠け表示と、今日の配置の壁紙保存つき。無料・登録不要です。">
+<meta property="og:url" content="https://itsukiaida.github.io/solar-system-simulator/">
+<meta property="og:image" content="https://itsukiaida.github.io/solar-system-simulator/solar-system-ogp_20261115.png">
+<meta name="twitter:card" content="summary_large_image">
+<script type="application/ld+json">
+{
+"@context": "https://schema.org",
+"@type": "WebApplication",
+"name": "太陽系シミュレーター",
+"description": "八つの惑星と七つの彗星の軌道を、太陽の北側から見て動かせるブラウザ用シミュレーター。速さを変えて時間を進めたり戻したりでき、天体ごとの距離や公転周期、地球を選ぶと月の満ち欠けと月齢も表示。今日の惑星の配置はスマホ壁紙として保存できます。PC・スマホ対応、インストール不要・無料です。",
+"url": "https://itsukiaida.github.io/solar-system-simulator/",
+"image": "https://itsukiaida.github.io/solar-system-simulator/solar-system-ogp_20261115.png",
+"applicationCategory": "EducationalApplication",
+"operatingSystem": "Any",
+"inLanguage": "ja",
+"isAccessibleForFree": true,
+"offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"}
+}
+</script>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap">
+<style>
+/* 配置: 上に日付ダイヤル、天体チップ、中央に盤面(キャンバス+情報カード)、下に操作。天文台の計器盤のような一画面構成 */
+:root {
+  --bg: #060a13;
+  --panel: #0c1322;
+  --panel-2: #121c32;
+  --line: #1f2b45;
+  --line-strong: #34476d;
+  --fg: #e2e9f6;
+  --muted: #8392af;
+  --sun: #f5b73f;
+  --focus: #7cc4ff;
+  --font-ui: "Zen Kaku Gothic New", "Hiragino Sans", "Yu Gothic", system-ui, sans-serif;
+  --font-num: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-ui);
+  font-size: 14px;
+  line-height: 1.5;
+  padding-top: 8px;
+  padding-bottom: calc(40px + env(safe-area-inset-bottom, 0px)); /* スマホ: 下部40px余白で操作系をシステムボタンに重ねない */
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.app { height: 100%; min-height: 520px; display: grid; grid-template-rows: auto auto minmax(0, 1fr) auto; gap: 10px; min-width: 0; }
+
+.top { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 4px 16px; }
+h1 { margin: 0; font-size: 17px; font-weight: 700; letter-spacing: 0.04em; }
+.sub { margin: 0; color: var(--muted); font-size: 12px; }
+.clock { text-align: right; }
+.date {
+  font-family: var(--font-num); font-size: clamp(20px, 4.4vw, 30px); font-weight: 500;
+  color: var(--sun); line-height: 1.15; letter-spacing: 0.02em; font-variant-numeric: tabular-nums;
+}
+.rel { font-family: var(--font-num); font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+.chips { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; scrollbar-width: thin; }
+.chip {
+  flex: 0 0 auto; display: inline-flex; align-items: center; gap: 7px;
+  font: inherit; font-size: 13px; color: var(--fg); background: transparent;
+  border: 1px solid var(--line); border-radius: 999px; padding: 5px 12px 5px 9px; min-height: 34px; cursor: pointer;
+}
+.chip i { width: 10px; height: 10px; border-radius: 50%; background: var(--chip); }
+.chip:hover { border-color: var(--line-strong); background: var(--panel); }
+.chip[aria-pressed="true"] { background: var(--panel-2); border-color: var(--chip); }
+
+.stage { position: relative; min-height: 300px; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; background: var(--bg); }
+canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; cursor: grab; }
+canvas:active { cursor: grabbing; }
+
+.scale { position: absolute; left: 12px; top: 10px; display: flex; flex-direction: column; gap: 4px; font-family: var(--font-num); font-size: 11px; color: var(--muted); pointer-events: none; max-width: 52%; }
+.scale .bar { height: 5px; border: 1px solid var(--muted); border-top: 0; }
+.scale .bar[hidden] { display: none; }
+
+.info {
+  position: absolute; top: 12px; right: 12px; width: 268px;
+  background: rgba(12, 19, 34, 0.88); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+  border: 1px solid var(--line); border-radius: 6px; padding: 12px 14px;
+}
+.info-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 8px; }
+.info-head .dot { width: 10px; height: 10px; border-radius: 50%; align-self: center; flex: none; }
+.info h2 { margin: 0; font-size: 18px; font-weight: 700; }
+.kind { color: var(--muted); font-size: 12px; }
+dl { margin: 0; }
+.row { display: flex; justify-content: space-between; gap: 12px; padding: 5px 0; border-top: 1px solid var(--line); }
+.row dt { color: var(--muted); font-size: 12px; }
+.row dd { margin: 0; font-family: var(--font-num); font-size: 13px; text-align: right; font-variant-numeric: tabular-nums; }
+.info .btn { margin-top: 8px; width: 100%; }
+
+.controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 18px; }
+.grp { display: flex; align-items: center; gap: 8px; }
+.grp label { color: var(--muted); font-size: 12px; }
+.btn {
+  font: inherit; font-size: 13px; color: var(--fg); background: var(--panel-2);
+  border: 1px solid var(--line-strong); border-radius: 6px; padding: 6px 12px; min-height: 36px; cursor: pointer;
+  display: inline-flex; align-items: center; gap: 6px;
+}
+.btn:hover { border-color: var(--muted); }
+.btn[aria-pressed="true"] { border-color: var(--sun); color: var(--sun); }
+.btn svg { width: 12px; height: 12px; fill: currentColor; }
+.seg { gap: 0; }
+.seg .btn:first-child { border-radius: 6px 0 0 6px; }
+.seg .btn:last-child { border-radius: 0 6px 6px 0; margin-left: -1px; }
+.chk { display: inline-flex; align-items: center; gap: 6px; color: var(--fg) !important; font-size: 13px !important; min-height: 36px; cursor: pointer; }
+input[type="range"] { width: 150px; accent-color: var(--sun); }
+output { font-family: var(--font-num); font-size: 12px; min-width: 8.5em; font-variant-numeric: tabular-nums; }
+.note { flex-basis: 100%; margin: 0; font-size: 11px; color: var(--muted); }
+:where(button, input):focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+.chips .sep { flex: 0 0 1px; align-self: stretch; margin: 4px 4px; background: var(--line-strong); }
+.info-note { margin: 0 0 8px; font-size: 12px; color: var(--muted); line-height: 1.55; }
+.info-note:empty { display: none; }
+.em {
+  position: absolute; left: 12px; bottom: 12px; width: 236px; padding: 8px 10px 10px;
+  background: rgba(12, 19, 34, 0.92); border: 1px solid var(--line); border-radius: 6px;
+}
+.em[hidden] { display: none; }
+.em-head { font-size: 12px; font-weight: 700; margin-bottom: 6px; letter-spacing: 0.04em; }
+.em canvas { position: static; inset: auto; width: 100%; height: auto; aspect-ratio: 1; border-radius: 4px; cursor: default; touch-action: auto; }
+.em canvas:active { cursor: default; }
+.em-cap { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
+.em-cap canvas { width: 36px; height: 36px; aspect-ratio: auto; flex: none; border-radius: 0; }
+.em-phase { font-size: 13px; font-weight: 700; }
+.em-age { font-family: var(--font-num); font-size: 11px; color: var(--muted); }
+.em-note { margin: 8px 0 0; font-size: 11px; color: var(--muted); line-height: 1.5; }
+
+.controls { gap: 8px 10px; }
+.controls .speed { flex: 1 1 200px; min-width: 0; }
+.controls input[type="range"] { flex: 1; width: auto; min-width: 60px; }
+.controls output { min-width: 5.6em; }
+.icon-btn { margin-left: auto; align-self: center; font: inherit; font-size: 12px; color: var(--muted); background: transparent; border: 1px solid var(--line-strong); border-radius: 999px; padding: 2px 10px; min-height: 28px; cursor: pointer; }
+.icon-btn:hover { color: var(--fg); }
+.info.collapsed #infoBody { display: none; }
+.info.collapsed .info-head { margin-bottom: 0; }
+
+.sheet { position: fixed; inset: 0; z-index: 30; display: flex; align-items: flex-end; justify-content: center; background: rgba(2, 5, 12, 0.66); padding-left: env(safe-area-inset-left, 0px); padding-right: env(safe-area-inset-right, 0px); }
+.sheet[hidden] { display: none; }
+.sheet-panel { width: min(480px, 100%); max-height: 88%; overflow-y: auto; background: var(--panel); border: 1px solid var(--line-strong); border-bottom: 0; border-radius: 12px 12px 0 0; padding: 14px 16px calc(18px + env(safe-area-inset-bottom, 0px)); display: flex; flex-direction: column; gap: 16px; }
+.sheet-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.sheet h2 { margin: 0; font-size: 16px; font-weight: 700; }
+.sheet h3 { margin: 0 0 8px; font-size: 12px; font-weight: 500; color: var(--muted); letter-spacing: 0.06em; }
+.set-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; }
+.hint { margin: 8px 0 0; font-size: 12px; color: var(--muted); }
+.sheet .note { margin: 0; }
+@media (min-width: 721px) {
+  .sheet { align-items: center; }
+  .sheet-panel { border-radius: 12px; border-bottom: 1px solid var(--line-strong); }
+}
+
+@media (max-width: 720px) {
+  .info { top: auto; bottom: 8px; left: 8px; right: 8px; width: auto; padding: 8px 12px; }
+  .info-head { margin-bottom: 4px; }
+  .info h2 { font-size: 16px; }
+  dl { display: grid; grid-template-columns: 1fr 1fr; column-gap: 16px; }
+  .row.extra { display: none; }
+  .info .btn { min-height: 32px; padding: 3px 10px; }
+  .grp.speed { flex: 1 1 220px; }
+  .info-note { display: none; }
+  .sub { display: none; }
+  h1 { font-size: 15px; }
+  .date { font-size: 22px; }
+  .controls .speed { flex-basis: 150px; }
+  .controls .speed label { display: none; }
+  .controls output { min-width: 5em; }
+  .em { left: auto; right: 8px; top: 8px; bottom: auto; width: 150px; padding: 6px 8px 8px; }
+  .em-note, .em-age { display: none; }
+  .em-cap { margin-top: 4px; gap: 6px; }
+  input[type="range"] { flex: 1; min-width: 100px; }
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <div>
+      <h1>太陽系シミュレーター</h1>
+      <p class="sub">八つの惑星と七つの彗星を、太陽の北側から見た軌道で動かします。ドラッグで移動、ホイールかピンチで拡大。</p>
+    </div>
+    <div class="clock">
+      <div id="date" class="date">----年--月--日</div>
+      <div id="rel" class="rel">今日</div>
+    </div>
+  </header>
+
+  <nav id="chips" class="chips" aria-label="天体を選ぶ"></nav>
+
+  <main class="stage" id="stage">
+    <canvas id="view" aria-label="太陽系の軌道図。惑星をタップすると詳細を表示します"></canvas>
+    <div class="scale"><div id="scaleBar" class="bar" hidden></div><span id="scaleTxt"></span></div>
+    <aside id="info" class="info">
+      <div class="info-head"><span id="infoDot" class="dot"></span><h2 id="infoName"></h2><span id="infoKind" class="kind"></span><button id="infoToggle" class="icon-btn" type="button" aria-expanded="true" aria-controls="infoBody">閉じる</button></div>
+      <div id="infoBody">
+      <p id="infoNote" class="info-note"></p>
+      <dl id="infoRows"></dl>
+      <button id="followBtn" class="btn" type="button" hidden>この天体を追う</button>
+      </div>
+    </aside>
+    <section id="em" class="em" hidden aria-label="太陽・地球・月の拡大図">
+      <div class="em-head">太陽・地球・月(拡大図)</div>
+      <canvas id="emView" width="216" height="216"></canvas>
+      <div class="em-cap">
+        <canvas id="phaseIcon" width="36" height="36"></canvas>
+        <div><div id="emPhase" class="em-phase"></div><div id="emAge" class="em-age"></div></div>
+      </div>
+      <p class="em-note">地球の北側から見た図です。月までの距離は実際の約17分の1に縮め、大きさの比は実際のままです。太陽は実際よりずっと遠くにあります。</p>
+    </section>
+  </main>
+
+  <footer class="controls">
+    <button id="play" class="btn" type="button"></button>
+    <div class="grp speed">
+      <label for="speed">速さ</label>
+      <input id="speed" type="range" min="0" max="6" step="1" value="2" aria-label="速さ">
+      <output id="speedOut" for="speed">1か月/秒</output>
+    </div>
+    <button id="home" class="btn" type="button" aria-label="全体表示" title="全体表示">全体</button>
+    <button id="settingsBtn" class="btn" type="button" aria-expanded="false" aria-controls="settings">設定</button>
+  </footer>
+</div>
+
+<div id="settings" class="sheet" hidden role="dialog" aria-modal="true" aria-labelledby="sheetTitle">
+  <div class="sheet-panel">
+    <div class="sheet-head"><h2 id="sheetTitle">設定</h2><button id="sheetClose" class="btn" type="button">閉じる</button></div>
+    <section class="set-sec">
+      <h3>時間</h3>
+      <div class="set-row">
+        <button id="dir" class="btn" type="button" aria-pressed="false">逆再生</button>
+        <button id="today" class="btn" type="button">今日に戻す</button>
+      </div>
+    </section>
+    <section class="set-sec">
+      <h3>距離の表示方法</h3>
+      <div class="grp seg" role="group" aria-label="距離の表示方法">
+        <button id="mSqrt" class="btn" type="button" aria-pressed="true">見やすさ優先</button>
+        <button id="mLin" class="btn" type="button" aria-pressed="false">実際の距離</button>
+      </div>
+      <p class="hint">見やすさ優先は、外側の距離を縮めて内側の惑星も見えるようにします。</p>
+    </section>
+    <section class="set-sec">
+      <h3>表示する天体</h3>
+      <div class="set-row">
+        <label class="chk"><input id="ast" type="checkbox" checked>小惑星帯</label>
+        <label class="chk"><input id="lbl" type="checkbox" checked>名前</label>
+        <label class="chk"><input id="com" type="checkbox" checked>彗星</label>
+      </div>
+    </section>
+    <section id="wpSec" class="set-sec" hidden>
+      <h3>壁紙</h3>
+      <div class="set-row"><button id="wpSave" class="btn" type="button">今日の壁紙を保存</button></div>
+      <p id="wpHint" class="hint">スマホ縦向き(1080×2400)のPNGを保存します。今日の惑星の位置と日付、月の形が入ります。</p>
+    </section>
+    <p class="note">惑星の軌道は2000年1月1日正午を基準にした平均軌道要素による近似で、軌道傾斜と惑星どうしの引力は含みません。彗星は軌道傾斜を含め、近日点を通る日をもとに計算して真上から見た位置に投影した近似です。月も簡易計算です。天体の大きさは実寸ではありません。</p>
+  </div>
+</div>
+
+<script>
+(() => {
+'use strict';
+const TAU = Math.PI * 2, RAD = Math.PI / 180;
+const J2000 = Date.UTC(2000, 0, 1, 12, 0, 0), DAY = 86400000;
+const AU_KM = 149597870.7, LIGHT_S = 499.004784;
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const $ = id => document.getElementById(id);
+
+const BODIES = [
+  { id: 'sun', name: '太陽', kind: '恒星', color: '#f5b73f', px: 9 },
+  { id: 'mercury', name: '水星', kind: '岩石惑星', color: '#b4aca3', px: 2.8, a: 0.38709927, e: 0.20563593, L0: 252.25084, w: 77.45645, P: 87.969, diam: 4879 },
+  { id: 'venus', name: '金星', kind: '岩石惑星', color: '#e8c27c', px: 4.2, a: 0.72333566, e: 0.00677672, L0: 181.97973, w: 131.53298, P: 224.701, diam: 12104 },
+  { id: 'earth', name: '地球', kind: '岩石惑星', color: '#4f9bd9', px: 4.4, a: 1.00000261, e: 0.01671123, L0: 100.46457, w: 102.93768, P: 365.256, diam: 12742 },
+  { id: 'mars', name: '火星', kind: '岩石惑星', color: '#d1603d', px: 3.4, a: 1.52371034, e: 0.0933941, L0: -4.55343205, w: -23.94362959, P: 686.98, diam: 6779 },
+  { id: 'jupiter', name: '木星', kind: '巨大ガス惑星', color: '#d9a46b', px: 8, a: 5.202887, e: 0.04838624, L0: 34.39644051, w: 14.72847983, P: 4332.589, diam: 139820 },
+  { id: 'saturn', name: '土星', kind: '巨大ガス惑星', color: '#e3c987', px: 7, ring: true, a: 9.53667594, e: 0.05386179, L0: 49.95424423, w: 92.59887831, P: 10759.22, diam: 116460 },
+  { id: 'uranus', name: '天王星', kind: '巨大氷惑星', color: '#8fd6d9', px: 5.6, a: 19.18916464, e: 0.04725744, L0: 313.23810451, w: 170.9542763, P: 30688.5, diam: 50724 },
+  { id: 'neptune', name: '海王星', kind: '巨大氷惑星', color: '#5b7be0', px: 5.4, a: 30.06992276, e: 0.00859048, L0: -55.12002969, w: 44.96476227, P: 60182, diam: 49244 }
+];
+const SUN = BODIES[0];
+const PLANETS = BODIES.slice(1);
+
+/* 彗星: a=軌道長半径(AU), e=離心率, i=傾斜, Om=昇交点経度, w=近日点引数(度), T=近日点通過日(J2000からの日数) */
+const COMETS = [
+  { id: 'halley', name: 'ハレー彗星', short: 'ハレー', kind: '周期彗星 1P', color: '#bfe6ff', a: 17.834, e: 0.96714, i: 162.26, Om: 58.42, w: 111.33, T: -5074.05,
+    note: '約76年ごとに戻ってくる、最も有名な周期彗星です。次の回帰は2061年ごろです。' },
+  { id: 'encke', name: 'エンケ彗星', short: 'エンケ', kind: '周期彗星 2P', color: '#a8e6cf', a: 2.215, e: 0.8483, i: 11.78, Om: 334.57, w: 186.54, T: 8695.2,
+    note: '知られている彗星の中でも最短クラスの、約3.3年周期の彗星です。' },
+  { id: 'cg67p', name: 'チュリュモフ・ゲラシメンコ彗星', short: 'チュリュモフ', kind: '周期彗星 67P', color: '#d6c7ff', a: 3.463, e: 0.6405, i: 7.04, Om: 50.14, w: 12.78, T: 7975.8,
+    note: '探査機ロゼッタが周回し、着陸機が降りた彗星です。' },
+  { id: 'swift', name: 'スイフト・タットル彗星', short: 'スイフト・タットル', kind: '周期彗星 109P', color: '#ffd6a5', a: 26.092, e: 0.9632, i: 113.45, Om: 139.38, w: 152.98, T: -2576.6,
+    note: 'ペルセウス座流星群のもとになった彗星です。次の回帰は2126年ごろです。' },
+  { id: 'tempel', name: 'テンペル・タットル彗星', short: 'テンペル・タットル', kind: '周期彗星 55P', color: '#c9f2a6', a: 10.337, e: 0.9055, i: 162.49, Om: 235.26, w: 172.5, T: -672.4,
+    note: 'しし座流星群のもとになった彗星です。約33年ごとに戻ってきます。' },
+  { id: 'halebopp', name: 'ヘール・ボップ彗星', short: 'ヘール・ボップ', kind: '長周期彗星 C/1995 O1', color: '#9fd8ff', a: 183.9, e: 0.99503, i: 89.43, Om: 282.47, w: 130.59, T: -1005.4,
+    note: '1997年に肉眼で長く見えた大彗星です。次に戻るのは約2,500年後です。' },
+  { id: 'hyakutake', name: '百武彗星', short: '百武', kind: '長周期彗星 C/1996 B2', color: '#e3d3ff', a: 1650, e: 0.99986, i: 124.92, Om: 188.05, w: 130.17, T: -1340.3,
+    note: '1996年に日本の百武裕司さんが発見した大彗星です。' }
+];
+for (const c of COMETS) {
+  c.comet = true; c.px = 3.2;
+  c.Pd = Math.pow(c.a, 1.5) * 365.25636; c.P = c.Pd; c.n = TAU / c.Pd;
+  c.b = c.a * Math.sqrt(1 - c.e * c.e); c.q = c.a * (1 - c.e);
+  const O = c.Om * RAD, w = c.w * RAD, ci = Math.cos(c.i * RAD);
+  c.Px = Math.cos(O) * Math.cos(w) - Math.sin(O) * Math.sin(w) * ci;
+  c.Py = Math.sin(O) * Math.cos(w) + Math.cos(O) * Math.sin(w) * ci;
+  c.Qx = -Math.cos(O) * Math.sin(w) - Math.sin(O) * Math.cos(w) * ci;
+  c.Qy = -Math.sin(O) * Math.sin(w) + Math.cos(O) * Math.cos(w) * ci;
+  /* 近日点付近を細かく取る */
+  const N = 240; c.orbit = new Float32Array((2 * N + 1) * 2); c.orbitR = new Float32Array(2 * N + 1);
+  for (let k = -N; k <= N; k++) {
+    const s = k / N, E = Math.PI * s * s * s, x = c.a * (Math.cos(E) - c.e), y = c.b * Math.sin(E), j = k + N;
+    c.orbit[j * 2] = x * c.Px + y * c.Qx; c.orbit[j * 2 + 1] = x * c.Py + y * c.Qy; c.orbitR[j] = Math.hypot(x, y);
+  }
+}
+BODIES.push(...COMETS);
+function cometPos(p, d, out) {
+  const E = solveE(p.n * (d - p.T), p.e), x = p.a * (Math.cos(E) - p.e), y = p.b * Math.sin(E);
+  out[0] = x * p.Px + y * p.Qx; out[1] = x * p.Py + y * p.Qy; out[2] = Math.hypot(x, y);
+}
+const byId = id => BODIES.find(b => b.id === id);
+
+/* ---- ケプラー方程式 ---- */
+function solveE(M, e) {
+  M = ((M + Math.PI) % TAU + TAU) % TAU - Math.PI;
+  const neg = M < 0, m = Math.abs(M);
+  let E = e < 0.8 ? m + e * Math.sin(m) : Math.PI;
+  for (let i = 0; i < 60; i++) {
+    const dE = (E - e * Math.sin(E) - m) / (1 - e * Math.cos(E));
+    E -= dE; if (Math.abs(dE) < 1e-12) break;
+  }
+  return neg ? -E : E;
+}
+for (const p of PLANETS) {
+  p.n = TAU / p.P; p.wr = p.w * RAD; p.L0r = p.L0 * RAD;
+  p.b = p.a * Math.sqrt(1 - p.e * p.e);
+  p.cw = Math.cos(p.wr); p.sw = Math.sin(p.wr);
+  const N = 180; p.orbit = new Float32Array((N + 1) * 2);
+  for (let i = 0; i <= N; i++) {
+    const E = i / N * TAU, x = p.a * (Math.cos(E) - p.e), y = p.b * Math.sin(E);
+    p.orbit[i * 2] = x * p.cw - y * p.sw; p.orbit[i * 2 + 1] = x * p.sw + y * p.cw;
+  }
+}
+function planetPos(p, d, out) {
+  const E = solveE(p.L0r - p.wr + p.n * d, p.e);
+  const x = p.a * (Math.cos(E) - p.e), y = p.b * Math.sin(E);
+  out[0] = x * p.cw - y * p.sw; out[1] = x * p.sw + y * p.cw; out[2] = Math.hypot(x, y);
+}
+
+/* ---- 小惑星帯・星 ---- */
+function rng(seed) { return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+const rand = rng(20261114);
+const AST = Array.from({ length: 420 }, () => {
+  const a = 2.15 + rand() * 1.1, e = rand() * 0.18, w = rand() * TAU;
+  return { a, e, b: a * Math.sqrt(1 - e * e), M0: rand() * TAU, n: TAU / (365.256 * Math.pow(a, 1.5)), cw: Math.cos(w), sw: Math.sin(w) };
+});
+const STARS = Array.from({ length: 220 }, () => ({ x: rand(), y: rand(), s: rand() < 0.15 ? 1.8 : 1, a: 0.25 + rand() * 0.55 }));
+
+/* ---- 状態 ---- */
+const cs = getComputedStyle(document.documentElement);
+const BG = cs.getPropertyValue('--bg').trim() || '#060a13';
+const FONT = cs.getPropertyValue('--font-ui').trim() || 'sans-serif';
+const SPEEDS = [
+  { d: 1, t: '1日/秒' }, { d: 7, t: '1週間/秒' }, { d: 30.4, t: '1か月/秒' }, { d: 91.3, t: '3か月/秒' },
+  { d: 365.25, t: '1年/秒' }, { d: 1826, t: '5年/秒' }, { d: 3652.5, t: '10年/秒' }
+];
+const S = {
+  days: (Date.now() - J2000) / DAY, nowDays: 0, dir: 1, speedIdx: 2,
+  playing: !matchMedia('(prefers-reduced-motion: reduce)').matches,
+  sel: byId('earth'), follow: false, zoom: 1, zoomGoal: 1, cam: { x: 0, y: 0 }, camGoal: { x: 0, y: 0 },
+  blend: 0, showAst: true, showLabels: true, showComets: true, inited: false, fitPrev: 0
+};
+S.nowDays = S.days;
+let mode = 'sqrt', W = 0, H = 0, DPR = 1;
+let LS = 1, PS = 1; /* 文字と天体の拡大率(壁紙の書き出し時だけ変える) */
+
+const canvas = $('view'), stage = $('stage');
+let ctx = canvas.getContext('2d');
+const tmp = [0, 0, 0];
+
+function fit() { const maxDisp = mode === 'sqrt' ? Math.sqrt(31) : 31; return 0.5 * Math.min(W, H) / maxDisp * 0.95; }
+const minZ = () => fit() * 0.15;
+const maxZ = () => fit() * (mode === 'linear' ? 600 : 80);
+function focusZoom(b) {
+  if (b.comet) {
+    const dr = mode === 'sqrt' ? Math.sqrt(b.r) : b.r, sq = mode === 'sqrt';
+    return clamp(0.5 * Math.min(W, H) / clamp(dr * 0.5, sq ? 0.7 : 0.6, sq ? 7 : 40), minZ(), maxZ());
+  }
+  const rd = mode === 'sqrt' ? Math.sqrt(b.a) : b.a; return clamp(0.5 * Math.min(W, H) / (rd * 0.45), minZ(), maxZ()); }
+
+function resize() {
+  const r = canvas.getBoundingClientRect();
+  W = Math.max(1, Math.round(r.width)); H = Math.max(1, Math.round(r.height));
+  DPR = window.devicePixelRatio || 1;
+  canvas.width = Math.round(W * DPR); canvas.height = Math.round(H * DPR);
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  const f = fit();
+  if (!S.inited) { S.inited = true; S.zoom = S.zoomGoal = f; }
+  else if (!S.follow && Math.abs(S.zoom / S.fitPrev - 1) < 0.01) { S.zoom = S.zoomGoal = f; }
+  S.fitPrev = f;
+}
+
+/* ---- 選択・UI ---- */
+const chipsEl = $('chips');
+let sepDone = false;
+for (const b of BODIES) {
+  if (b.comet && !sepDone) {
+    const sp = document.createElement('span'); sp.className = 'sep'; sp.setAttribute('role', 'separator');
+    chipsEl.append(sp); sepDone = true;
+  }
+  const btn = document.createElement('button');
+  btn.type = 'button'; btn.className = 'chip'; btn.dataset.id = b.id;
+  btn.style.setProperty('--chip', b.color);
+  btn.setAttribute('aria-pressed', 'false');
+  btn.innerHTML = '<i></i>' + b.name;
+  btn.addEventListener('click', () => selectBody(b, true));
+  chipsEl.append(btn);
+}
+const fmtNum = (v, d) => v.toLocaleString('ja-JP', { minimumFractionDigits: d, maximumFractionDigits: d });
+function fmtKm(km) {
+  const man = Math.round(km / 1e4), oku = Math.floor(man / 1e4), rest = man % 1e4;
+  if (oku > 0) return rest > 0 ? oku + '億' + rest.toLocaleString('ja-JP') + '万 km' : oku + '億 km';
+  return man.toLocaleString('ja-JP') + '万 km';
+}
+function fmtLight(au) {
+  const s = Math.round(au * LIGHT_S), h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), sec = s % 60;
+  return h > 0 ? h + '時間' + m + '分' : m + '分' + sec + '秒';
+}
+function fmtPeriod(P) {
+  if (P < 300) return Math.round(P) + ' 日';
+  const y = P / 365.2422;
+  if (y >= 1000) return '約' + (Math.round(y / 100) * 100).toLocaleString('ja-JP') + ' 年';
+  return fmtNum(y, y < 10 ? 2 : y < 100 ? 1 : 0) + ' 年';
+}
+function fmtPeri(dd) {
+  const y = (dd - S.days) / 365.2422;
+  if (Math.abs(y) > 1000) return '約' + (Math.round(Math.abs(y) / 100) * 100).toLocaleString('ja-JP') + (y > 0 ? '年後' : '年前');
+  return fmtDate(dd);
+}
+const periNext = x => x.T + Math.ceil((S.days - x.T) / x.Pd) * x.Pd;
+
+function rowDefs(b) {
+  if (b === SUN) return [
+    { label: '直径', fn: () => '139万 km' },
+    { label: '地球との比', fn: () => '直径 約109倍' },
+    { label: '質量', fn: () => '地球の約33万倍' },
+    { label: '表面温度', fn: () => '約5,500 ℃', extra: true },
+    { label: '地球まで光が届く時間', fn: () => '8分19秒', extra: true }
+  ];
+  if (b.comet) return [
+    { label: '太陽からの距離', fn: x => fmtNum(x.r, x.r < 10 ? 3 : 1) + ' AU' },
+    { label: '距離(km)', fn: x => fmtKm(x.r * AU_KM) },
+    { label: '太陽光が届くまで', fn: x => fmtLight(x.r) },
+    { label: '軌道速度', fn: x => fmtNum(29.7847 * Math.sqrt(2 / x.r - 1 / x.a), 1) + ' km/s' },
+    { label: '公転周期', fn: x => fmtPeriod(x.P) },
+    { label: '前回の近日点', fn: x => fmtPeri(periNext(x) - x.Pd) },
+    { label: '次回の近日点', fn: x => fmtPeri(periNext(x)) },
+    { label: '近日点距離', fn: x => fmtNum(x.q, 2) + ' AU', extra: true },
+    { label: '軌道の向き', fn: x => (x.i > 90 ? '逆行' : '順行') + '(傾斜 ' + fmtNum(x.i, 1) + '°)', extra: true },
+    { label: '離心率', fn: x => fmtNum(x.e, 3), extra: true }
+  ];
+  return [
+    { label: '太陽からの距離', fn: x => fmtNum(x.r, 3) + ' AU' },
+    { label: '距離(km)', fn: x => fmtKm(x.r * AU_KM) },
+    { label: '太陽光が届くまで', fn: x => fmtLight(x.r) },
+    { label: '軌道速度', fn: x => fmtNum(29.7847 * Math.sqrt(2 / x.r - 1 / x.a), 1) + ' km/s' },
+    { label: '公転周期', fn: x => fmtPeriod(x.P) },
+    { label: '近日点 / 遠日点', fn: x => fmtNum(x.a * (1 - x.e), 2) + ' / ' + fmtNum(x.a * (1 + x.e), 2) + ' AU', extra: true },
+    { label: '離心率', fn: x => fmtNum(x.e, 3), extra: true },
+    { label: '直径', fn: x => x.diam.toLocaleString('ja-JP') + ' km', extra: true }
+  ];
+}
+let infoRows = [];
+function buildInfo() {
+  const b = S.sel, dl = $('infoRows');
+  $('infoName').textContent = b.name; $('infoKind').textContent = b.kind; $('infoDot').style.background = b.color;
+  dl.textContent = ''; infoRows = [];
+  for (const def of rowDefs(b)) {
+    const row = document.createElement('div'); row.className = 'row' + (def.extra ? ' extra' : '');
+    const dt = document.createElement('dt'); dt.textContent = def.label;
+    const dd = document.createElement('dd'); row.append(dt, dd); dl.append(row);
+    infoRows.push({ dd, fn: def.fn });
+  }
+  refreshInfo();
+}
+function refreshInfo() { for (const r of infoRows) r.dd.textContent = r.fn(S.sel); }
+function syncUI() {
+  for (const c of chipsEl.children) if (c.dataset.id) c.setAttribute('aria-pressed', String(c.dataset.id === S.sel.id));
+  $('followBtn').hidden = S.follow;
+  $('em').hidden = S.sel.id !== 'earth';
+  $('infoNote').textContent = S.sel.note || '';
+}
+function selectBody(b, follow) {
+  S.sel = b; S.follow = follow;
+  if (follow) { S.zoomGoal = b === SUN ? fit() : focusZoom(b); S.blend = 0.9; }
+  syncUI(); buildInfo();
+}
+function setMode(m) {
+  mode = m;
+  $('mSqrt').setAttribute('aria-pressed', String(m === 'sqrt'));
+  $('mLin').setAttribute('aria-pressed', String(m === 'linear'));
+  S.zoomGoal = S.follow && S.sel !== SUN ? focusZoom(S.sel) : fit();
+  S.zoom = S.zoomGoal; S.blend = 0;
+  if (!S.follow) { S.cam.x = S.cam.y = S.camGoal.x = S.camGoal.y = 0; }
+  S.fitPrev = fit();
+}
+function setPlayUI() {
+  $('play').innerHTML = S.playing
+    ? '<svg viewBox="0 0 12 12" aria-hidden="true"><rect x="1.5" y="1" width="3.2" height="10"/><rect x="7.3" y="1" width="3.2" height="10"/></svg>停止'
+    : '<svg viewBox="0 0 12 12" aria-hidden="true"><path d="M2 1l9 5-9 5z"/></svg>再生';
+}
+
+/* ---- 投影: 見やすさ優先は距離を平方根で圧縮 ---- */
+function proj(x, y, out) {
+  if (mode === 'sqrt') { const r = Math.hypot(x, y); if (r > 1e-9) { const f = 1 / Math.sqrt(r); x *= f; y *= f; } }
+  out[0] = x; out[1] = y;
+}
+
+/* ---- 更新 ---- */
+function placeBodies() {
+  SUN.dx = 0; SUN.dy = 0; SUN.r = 0;
+  for (const p of PLANETS) { planetPos(p, S.days, tmp); p.r = tmp[2]; p.wx = tmp[0]; p.wy = tmp[1]; proj(tmp[0], tmp[1], tmp); p.dx = tmp[0]; p.dy = tmp[1]; }
+  for (const p of COMETS) { cometPos(p, S.days, tmp); p.r = tmp[2]; proj(tmp[0], tmp[1], tmp); p.dx = tmp[0]; p.dy = tmp[1]; }
+}
+function update(dt) {
+  S.days = clamp(S.days, -3.6e7, 3.6e7);
+  placeBodies();
+  S.zoom += (S.zoomGoal - S.zoom) * (1 - Math.exp(-dt * 7));
+  if (Math.abs(S.zoom / S.zoomGoal - 1) < 0.0005) S.zoom = S.zoomGoal;
+  if (S.follow) { S.camGoal.x = S.sel.dx; S.camGoal.y = S.sel.dy; }
+  if (S.blend > 0) {
+    const k = 1 - Math.exp(-dt * 7);
+    S.cam.x += (S.camGoal.x - S.cam.x) * k; S.cam.y += (S.camGoal.y - S.cam.y) * k; S.blend -= dt;
+  } else if (S.follow) { S.cam.x = S.camGoal.x; S.cam.y = S.camGoal.y; }
+}
+
+/* ---- 描画 ---- */
+function bodyPx(b) {
+  let base = b.px;
+  if (mode === 'linear') base = b === SUN ? 5 : base * 0.7;
+  return base * PS * clamp(Math.pow(S.zoom / fit(), 0.3), 1, 3.5);
+}
+function rgba(hex, a) { const n = parseInt(hex.slice(1), 16); return 'rgba(' + (n >> 16) + ',' + (n >> 8 & 255) + ',' + (n & 255) + ',' + a + ')'; }
+
+function draw() {
+  const c = ctx, z = S.zoom, cx = W / 2, cy = H / 2, camx = S.cam.x, camy = S.cam.y, sq = mode === 'sqrt';
+  c.fillStyle = BG; c.fillRect(0, 0, W, H);
+
+  c.fillStyle = '#cfdcf5';
+  const ox = -camx * z * 0.015, oy = camy * z * 0.015;
+  for (const s of STARS) {
+    let x = (s.x * W + ox) % W; if (x < 0) x += W;
+    let y = (s.y * H + oy) % H; if (y < 0) y += H;
+    c.globalAlpha = s.a; c.fillRect(x, y, s.s, s.s);
+  }
+  c.globalAlpha = 1;
+
+  if (S.showAst) {
+    c.fillStyle = 'rgba(178,166,148,0.65)';
+    for (const a of AST) {
+      const E = solveE(a.M0 + a.n * S.days, a.e), x = a.a * (Math.cos(E) - a.e), y = a.b * Math.sin(E);
+      let X = x * a.cw - y * a.sw, Y = x * a.sw + y * a.cw;
+      if (sq) { const f = 1 / Math.sqrt(Math.hypot(X, Y)); X *= f; Y *= f; }
+      c.fillRect(cx + (X - camx) * z - 0.75, cy - (Y - camy) * z - 0.75, 1.5, 1.5);
+    }
+  }
+
+  c.lineJoin = 'round'; c.lineCap = 'round';
+  for (const p of PLANETS) {
+    const o = p.orbit, selected = S.sel === p;
+    c.beginPath();
+    for (let i = 0; i < o.length; i += 2) {
+      let x = o[i], y = o[i + 1];
+      if (sq) { const f = 1 / Math.sqrt(Math.hypot(x, y)); x *= f; y *= f; }
+      const sx = cx + (x - camx) * z, sy = cy - (y - camy) * z;
+      if (i === 0) c.moveTo(sx, sy); else c.lineTo(sx, sy);
+    }
+    c.closePath();
+    c.strokeStyle = selected ? rgba(p.color, 0.75) : 'rgba(120,150,200,0.22)';
+    c.lineWidth = selected ? 1.5 : 1; c.stroke();
+  }
+
+  /* 彗星の軌道(破線)。遠すぎる部分は描かない */
+  if (S.showComets || S.sel.comet) {
+    c.setLineDash([5, 5]); c.lineWidth = 1;
+    for (const p of COMETS) {
+      const o = p.orbit, rr = p.orbitR, selected = S.sel === p; let pen = false;
+      c.strokeStyle = selected ? rgba(p.color, 0.85) : 'rgba(150,190,240,0.3)';
+      c.beginPath();
+      for (let k = 0; k < rr.length; k++) {
+        if (rr[k] > 150) { pen = false; continue; }
+        let x = o[k * 2], y = o[k * 2 + 1];
+        if (sq) { const h = Math.hypot(x, y); if (h > 1e-9) { const f = 1 / Math.sqrt(h); x *= f; y *= f; } }
+        const sx = cx + (x - camx) * z, sy = cy - (y - camy) * z;
+        if (!pen) { c.moveTo(sx, sy); pen = true; } else c.lineTo(sx, sy);
+      }
+      c.stroke();
+    }
+    c.setLineDash([]);
+  }
+
+  /* 公転の進行方向がわかる尾 */
+  c.lineWidth = 2.2;
+  for (const p of PLANETS) {
+    const N = 28, span = p.P * 0.22; let px = 0, py = 0;
+    c.strokeStyle = p.color;
+    for (let i = 0; i <= N; i++) {
+      planetPos(p, S.days - S.dir * span * i / N, tmp); proj(tmp[0], tmp[1], tmp);
+      const sx = cx + (tmp[0] - camx) * z, sy = cy - (tmp[1] - camy) * z;
+      if (i > 0) { c.globalAlpha = Math.pow(1 - (i - 1) / N, 1.6) * 0.8; c.beginPath(); c.moveTo(px, py); c.lineTo(sx, sy); c.stroke(); }
+      px = sx; py = sy;
+    }
+  }
+  c.globalAlpha = 1;
+
+  for (const b of BODIES) {
+    b.sx = cx + (b.dx - camx) * z; b.sy = cy - (b.dy - camy) * z; b.pr = bodyPx(b);
+  }
+
+  /* 太陽 */
+  { const g = c.createRadialGradient(SUN.sx, SUN.sy, 0, SUN.sx, SUN.sy, SUN.pr * 5);
+    g.addColorStop(0, 'rgba(255,214,120,0.85)'); g.addColorStop(0.25, 'rgba(245,183,63,0.32)'); g.addColorStop(1, 'rgba(245,183,63,0)');
+    c.fillStyle = g; c.beginPath(); c.arc(SUN.sx, SUN.sy, SUN.pr * 5, 0, TAU); c.fill();
+    c.fillStyle = '#ffd98a'; c.beginPath(); c.arc(SUN.sx, SUN.sy, SUN.pr, 0, TAU); c.fill(); }
+
+  for (const p of PLANETS) {
+    const x = p.sx, y = p.sy, r = p.pr;
+    if (x < -40 || x > W + 40 || y < -40 || y > H + 40) continue;
+    c.fillStyle = rgba(p.color, 0.16); c.beginPath(); c.arc(x, y, r * 2.2, 0, TAU); c.fill();
+    if (p.ring) { c.strokeStyle = 'rgba(227,201,135,0.85)'; c.lineWidth = Math.max(1, r * 0.26); c.beginPath(); c.ellipse(x, y, r * 2.1, r * 0.75, -0.35, 0, TAU); c.stroke(); }
+    c.fillStyle = p.color; c.beginPath(); c.arc(x, y, r, 0, TAU); c.fill();
+    if (p.ring) { c.strokeStyle = 'rgba(227,201,135,0.85)'; c.lineWidth = Math.max(1, r * 0.26); c.beginPath(); c.ellipse(x, y, r * 2.1, r * 0.75, -0.35, 0, Math.PI); c.stroke(); }
+  }
+
+  /* 彗星: 尾は太陽と反対側にのびる。太陽に近いほど長い */
+  for (const p of COMETS) {
+    if (!S.showComets && p !== S.sel) continue;
+    const x = p.sx, y = p.sy;
+    if (x < -150 || x > W + 150 || y < -150 || y > H + 150) continue;
+    let ux = x - SUN.sx, uy = y - SUN.sy; const ul = Math.hypot(ux, uy);
+    const L = p.r < 10 ? 90 * Math.min(1, Math.pow(2.2 / Math.max(p.r, 0.3), 1.1)) : 0;
+    if (ul > 1e-3 && L > 4) {
+      ux /= ul; uy /= ul;
+      for (const t of [{ ang: 0, len: 1, w: 2.6, col: '190,230,255', al: 0.85 }, { ang: 0.22, len: 0.7, w: 5.5, col: '255,232,200', al: 0.5 }]) {
+        const ca = Math.cos(t.ang), sa = Math.sin(t.ang), dx = ux * ca - uy * sa, dy = ux * sa + uy * ca, len = L * t.len;
+        const ex = x + dx * len, ey = y + dy * len, g = c.createLinearGradient(x, y, ex, ey);
+        g.addColorStop(0, 'rgba(' + t.col + ',' + t.al + ')'); g.addColorStop(1, 'rgba(' + t.col + ',0)');
+        c.fillStyle = g; c.beginPath(); c.moveTo(x - dy * t.w, y + dx * t.w); c.lineTo(ex, ey); c.lineTo(x + dy * t.w, y - dx * t.w); c.closePath(); c.fill();
+      }
+    }
+    c.fillStyle = rgba(p.color, 0.22); c.beginPath(); c.arc(x, y, p.pr * 2.6, 0, TAU); c.fill();
+    c.fillStyle = p.color; c.beginPath(); c.arc(x, y, p.pr, 0, TAU); c.fill();
+  }
+
+  const sel = S.sel;
+  c.strokeStyle = 'rgba(255,255,255,0.65)'; c.lineWidth = 1; c.setLineDash([3, 3]);
+  c.beginPath(); c.arc(sel.sx, sel.sy, sel.pr * (sel === SUN ? 1.6 : 1) + 6, 0, TAU); c.stroke(); c.setLineDash([]);
+
+  if (S.showLabels) {
+    const placed = [], order = [sel].concat(BODIES.filter(b => b !== sel && (S.showComets || !b.comet)));
+    for (const b of order) {
+      if (b.sx < -30 || b.sx > W + 30 || b.sy < -20 || b.sy > H + 20) continue;
+      c.font = (b === sel ? '700 ' : '400 ') + Math.round(12 * LS) + 'px ' + FONT;
+      const lb = b.short || b.name;
+      const tw = c.measureText(lb).width, x = b.sx + b.pr + 6, y = b.sy - b.pr - 2;
+      const rc = { x1: x - 2, y1: y - 12 * LS, x2: x + tw + 2, y2: y + 4 * LS };
+      if (placed.some(q => !(rc.x2 < q.x1 || rc.x1 > q.x2 || rc.y2 < q.y1 || rc.y1 > q.y2))) continue;
+      placed.push(rc);
+      c.fillStyle = b === sel ? '#ffffff' : 'rgba(226,233,246,0.8)'; c.fillText(lb, x, y);
+    }
+  }
+}
+
+/* ---- 日付・スケール表示 ---- */
+function fmtDate(days) {
+  const t = new Date(J2000 + days * DAY), y = t.getFullYear();
+  return (y <= 0 ? '紀元前' + (1 - y) + '年' : y + '年') + (t.getMonth() + 1) + '月' + t.getDate() + '日';
+}
+let lastDate = '', lastRel = '', lastScale = '', lastBarW = -1;
+function updateClock() {
+  const ds = fmtDate(S.days); if (ds !== lastDate) { $('date').textContent = ds; lastDate = ds; }
+  const dd = S.days - S.nowDays, yrs = dd / 365.2422;
+  const rs = Math.abs(dd) < 0.5 ? '今日' : Math.abs(yrs) < 1 ? '今日から ' + (dd > 0 ? '+' : '-') + Math.round(Math.abs(dd)) + ' 日' : '今日から ' + (yrs > 0 ? '+' : '-') + fmtNum(Math.abs(yrs), 1) + ' 年';
+  if (rs !== lastRel) { $('rel').textContent = rs; lastRel = rs; }
+}
+function updateScale() {
+  const bar = $('scaleBar'); let txt, w = 0;
+  if (mode === 'linear') {
+    let au = 0.01; for (const q of [0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1, 2, 5, 10, 20]) if (q * S.zoom <= 150) au = q;
+    w = Math.round(au * S.zoom); txt = au + ' AU ≈ ' + fmtKm(au * AU_KM);
+  } else txt = '距離は平方根で圧縮表示(AU=太陽〜地球の距離)';
+  if (txt !== lastScale) { $('scaleTxt').textContent = txt; lastScale = txt; }
+  if (w !== lastBarW) { bar.hidden = w === 0; bar.style.width = w + 'px'; lastBarW = w; }
+}
+
+/* ---- 操作 ---- */
+function zoomAt(px, py, f) {
+  const nz = clamp(S.zoom * f, minZ(), maxZ());
+  if (!S.follow) {
+    const wx = S.cam.x + (px - W / 2) / S.zoom, wy = S.cam.y - (py - H / 2) / S.zoom;
+    S.cam.x = wx - (px - W / 2) / nz; S.cam.y = wy + (py - H / 2) / nz;
+  }
+  S.zoom = S.zoomGoal = nz;
+}
+canvas.addEventListener('wheel', e => { e.preventDefault(); zoomAt(e.offsetX, e.offsetY, Math.exp(-e.deltaY * 0.0015)); }, { passive: false });
+
+const ptrs = new Map(); let pinchDist = 0, down = null;
+const pinchInfo = () => { const [a, b] = [...ptrs.values()]; return { d: Math.hypot(a.x - b.x, a.y - b.y), x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }; };
+canvas.addEventListener('pointerdown', e => {
+  canvas.setPointerCapture(e.pointerId);
+  ptrs.set(e.pointerId, { x: e.offsetX, y: e.offsetY });
+  if (ptrs.size === 1) down = { x: e.offsetX, y: e.offsetY, moved: false };
+  else { down = null; pinchDist = pinchInfo().d; }
+});
+canvas.addEventListener('pointermove', e => {
+  const p = ptrs.get(e.pointerId); if (!p) return;
+  const nx = e.offsetX, ny = e.offsetY;
+  if (ptrs.size === 1) {
+    if (down && !down.moved && Math.hypot(nx - down.x, ny - down.y) > 5) down.moved = true;
+    if (down && down.moved) { S.follow = false; S.blend = 0; S.cam.x -= (nx - p.x) / S.zoom; S.cam.y += (ny - p.y) / S.zoom; syncUI(); }
+    p.x = nx; p.y = ny;
+  } else if (ptrs.size === 2) {
+    p.x = nx; p.y = ny;
+    const info = pinchInfo(); if (pinchDist > 0) zoomAt(info.x, info.y, info.d / pinchDist); pinchDist = info.d;
+  }
+});
+function endPointer(e) {
+  if (e.type === 'pointerup' && ptrs.size === 1 && down && !down.moved) pick(e.offsetX, e.offsetY);
+  ptrs.delete(e.pointerId); down = null; pinchDist = 0;
+}
+canvas.addEventListener('pointerup', endPointer);
+canvas.addEventListener('pointercancel', endPointer);
+function pick(x, y) {
+  let best = null, bd = Infinity;
+  for (const b of BODIES) {
+    if (b.comet && !S.showComets && b !== S.sel) continue;
+    const d = Math.hypot(b.sx - x, b.sy - y) - Math.max(b.pr + 8, 16);
+    if (d < 0 && d < bd) { bd = d; best = b; }
+  }
+  if (best) selectBody(best, true);
+}
+
+$('play').addEventListener('click', () => { S.playing = !S.playing; setPlayUI(); });
+$('dir').addEventListener('click', () => { S.dir = -S.dir; $('dir').setAttribute('aria-pressed', String(S.dir < 0)); });
+$('speed').addEventListener('input', e => { S.speedIdx = +e.target.value; $('speedOut').textContent = SPEEDS[S.speedIdx].t; });
+$('today').addEventListener('click', () => { S.days = (Date.now() - J2000) / DAY; S.nowDays = S.days; });
+$('home').addEventListener('click', () => { S.follow = false; S.camGoal.x = S.camGoal.y = 0; S.zoomGoal = fit(); S.blend = 0.9; syncUI(); });
+$('followBtn').addEventListener('click', () => selectBody(S.sel, true));
+$('mSqrt').addEventListener('click', () => setMode('sqrt'));
+$('mLin').addEventListener('click', () => setMode('linear'));
+$('ast').addEventListener('change', e => { S.showAst = e.target.checked; });
+$('lbl').addEventListener('change', e => { S.showLabels = e.target.checked; });
+$('com').addEventListener('change', e => { S.showComets = e.target.checked; });
+document.addEventListener('keydown', e => {
+  if (e.code === 'Space' && !e.target.closest('button, input')) { e.preventDefault(); S.playing = !S.playing; setPlayUI(); }
+});
+
+/* ---- 地球を選んだときの拡大図: 太陽・地球・月 ---- */
+const emBox = $('em'), emCv = $('emView'), emCtx = emCv.getContext('2d'), phCv = $('phaseIcon'), phCtx = phCv.getContext('2d');
+let EW = 0;
+function resizeEm() {
+  const s = Math.round(emCv.getBoundingClientRect().width);
+  if (s < 2 || s === EW) return;
+  EW = s; emCv.width = Math.round(s * DPR); emCv.height = Math.round(s * DPR);
+  emCtx.setTransform(DPR, 0, 0, DPR, 0, 0);
+}
+function initEM() {
+  phCv.width = Math.round(36 * DPR); phCv.height = Math.round(36 * DPR); phCtx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  new ResizeObserver(resizeEm).observe(emCv);
+}
+/* 月の黄経(簡易式: 平均黄経に最大の周期項を加える) */
+const moonLon = d => (218.316 + 13.176396 * d + 6.289 * Math.sin((134.963 + 13.064993 * d) * RAD)) * RAD;
+function moonState() {
+  const e = byId('earth'), sunAng = Math.atan2(-e.wy, -e.wx), mAng = moonLon(S.days);
+  return { sunAng, mAng, d: ((mAng - sunAng + Math.PI) % TAU + TAU) % TAU - Math.PI, el: ((mAng - sunAng) % TAU + TAU) % TAU };
+}
+const phaseName = deg => ['新月', '三日月', '上弦の月', '十三夜ごろの月', '満月', '十八夜ごろの月', '下弦の月', '二十六夜ごろの月'][Math.floor(((deg + 22.5) % 360) / 45)];
+/* 太陽に向いた半分だけ明るい球を描く(真上から見た図) */
+function litDisc(c, x, y, r, ang, dark, light) {
+  c.fillStyle = dark; c.beginPath(); c.arc(x, y, r, 0, TAU); c.fill();
+  c.fillStyle = light; c.beginPath(); c.arc(x, y, r, -ang - Math.PI / 2, -ang + Math.PI / 2, false); c.closePath(); c.fill();
+}
+/* 地球から見た月の満ち欠け(北半球での見え方) */
+function drawPhase(c, x, y, R, el) {
+  const cs2 = Math.cos(el), waxing = Math.sin(el) > 0;
+  c.clearRect(0, 0, 36, 36);
+  c.fillStyle = '#2b303b'; c.beginPath(); c.arc(x, y, R, 0, TAU); c.fill();
+  c.fillStyle = '#e8e4d4'; c.beginPath();
+  c.arc(x, y, R, -Math.PI / 2, Math.PI / 2, !waxing);
+  c.ellipse(x, y, Math.max(0.01, R * Math.abs(cs2)), R, 0, Math.PI / 2, -Math.PI / 2, waxing ? cs2 > 0 : cs2 < 0);
+  c.closePath(); c.fill();
+  c.strokeStyle = 'rgba(226,233,246,0.35)'; c.lineWidth = 1; c.beginPath(); c.arc(x, y, R, 0, TAU); c.stroke();
+}
+function drawEM() {
+  if (emBox.hidden || !EW) return;
+  const c = emCtx, s = EW, cx = s / 2, cy = s / 2, st = moonState();
+  const er = s * 0.085, mr = er * 0.2725, mo = s * 0.30, sd = s * 0.43, sr = s * 0.05;
+  c.fillStyle = '#050912'; c.fillRect(0, 0, s, s);
+  const sx = cx + sd * Math.cos(st.sunAng), sy = cy - sd * Math.sin(st.sunAng);
+  const g = c.createRadialGradient(sx, sy, 0, sx, sy, sr * 3);
+  g.addColorStop(0, 'rgba(255,214,120,0.8)'); g.addColorStop(0.35, 'rgba(245,183,63,0.28)'); g.addColorStop(1, 'rgba(245,183,63,0)');
+  c.fillStyle = g; c.beginPath(); c.arc(sx, sy, sr * 3, 0, TAU); c.fill();
+  c.fillStyle = '#ffd98a'; c.beginPath(); c.arc(sx, sy, sr, 0, TAU); c.fill();
+  c.lineWidth = 1; c.setLineDash([3, 4]);
+  c.strokeStyle = 'rgba(245,183,63,0.4)'; c.beginPath(); c.moveTo(cx, cy); c.lineTo(sx, sy); c.stroke();
+  c.strokeStyle = 'rgba(120,150,200,0.4)'; c.beginPath(); c.arc(cx, cy, mo, 0, TAU); c.stroke();
+  c.setLineDash([]);
+  /* 太陽の方向と月の方向のあいだの角(離角) */
+  const ar = s * 0.17;
+  c.strokeStyle = 'rgba(245,183,63,0.75)'; c.beginPath(); c.arc(cx, cy, ar, -st.sunAng, -st.mAng, st.d > 0); c.stroke();
+  const mid = st.sunAng + st.d / 2;
+  c.font = '500 ' + Math.round(s * 0.05) + 'px ' + FONT; c.textAlign = 'center'; c.textBaseline = 'middle';
+  c.fillStyle = 'rgba(245,183,63,0.95)';
+  c.fillText(Math.round(Math.abs(st.d) / RAD) + '°', cx + (ar + s * 0.055) * Math.cos(mid), cy - (ar + s * 0.055) * Math.sin(mid));
+  litDisc(c, cx, cy, er, st.sunAng, '#14283f', '#4f9bd9');
+  const mx = cx + mo * Math.cos(st.mAng), my = cy - mo * Math.sin(st.mAng);
+  litDisc(c, mx, my, mr, st.sunAng, '#2b303b', '#e8e4d4');
+  c.font = '400 ' + Math.round(s * 0.052) + 'px ' + FONT; c.fillStyle = 'rgba(226,233,246,0.9)';
+  c.fillText('太陽', sx - (sr + s * 0.045) * Math.cos(st.sunAng), sy + (sr + s * 0.045) * Math.sin(st.sunAng));
+  c.fillText('月', mx + (mr + s * 0.04) * Math.cos(st.mAng), my - (mr + s * 0.04) * Math.sin(st.mAng));
+  c.fillText('地球', cx, cy + er + s * 0.045);
+}
+function refreshEM() {
+  if (emBox.hidden) return;
+  const st = moonState(), deg = st.el / RAD, age = st.el / TAU * 29.530589, lit = (1 - Math.cos(st.el)) / 2;
+  $('emPhase').textContent = phaseName(deg);
+  $('emAge').textContent = '月齢 ' + fmtNum(age, 1) + ' 日 ・ 明るい部分 ' + Math.round(lit * 100) + '%';
+  drawPhase(phCtx, 18, 18, 15, st.el);
+}
+
+/* ---- 設定シートと情報カードの開閉 ---- */
+const sheet = $('settings'), sBtn = $('settingsBtn');
+function setSheet(open) {
+  sheet.hidden = !open; sBtn.setAttribute('aria-expanded', String(open));
+  (open ? $('sheetClose') : sBtn).focus();
+}
+sBtn.addEventListener('click', () => setSheet(sheet.hidden));
+$('sheetClose').addEventListener('click', () => setSheet(false));
+sheet.addEventListener('click', e => { if (e.target === sheet) setSheet(false); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && !sheet.hidden) setSheet(false); });
+const infoEl = $('info'), infoBtn = $('infoToggle');
+function setInfoOpen(o) {
+  infoEl.classList.toggle('collapsed', !o);
+  infoBtn.setAttribute('aria-expanded', String(o)); infoBtn.textContent = o ? '閉じる' : '詳細';
+}
+infoBtn.addEventListener('click', () => setInfoOpen(infoEl.classList.contains('collapsed')));
+setInfoOpen(!matchMedia('(max-width: 720px)').matches);
+
+/* ---- 今日の壁紙(1080x2400)を書き出して保存 ---- */
+let wpDl = null;
+/* 移行対応: Claude専用の downloads API を、通常ブラウザのダウンロードに置き換え */
+wpDl = { save: async ({ filename, data }) => {
+  const url = URL.createObjectURL(data);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
+} };
+$('wpSec').hidden = false;
+async function makeWallpaper() {
+  try { await document.fonts.load('500 64px ' + FONT); await document.fonts.load('400 24px ' + FONT); } catch (e) {}
+  const off = document.createElement('canvas'); off.width = 1080; off.height = 2400;
+  const keep = { W, H, DPR, ctx, mode, LS, PS, days: S.days, zoom: S.zoom, sel: S.sel, cx: S.cam.x, cy: S.cam.y, ast: S.showAst, lbl: S.showLabels, com: S.showComets };
+  const today = (Date.now() - J2000) / DAY;
+  try {
+    W = 1080; H = 2400; DPR = 1; ctx = off.getContext('2d'); mode = 'sqrt'; LS = 2; PS = 1.6;
+    S.days = today; S.sel = byId('earth'); S.cam.x = S.cam.y = 0; S.showAst = S.showLabels = S.showComets = true;
+    placeBodies(); S.zoom = fit(); draw();
+    const st = moonState(), age = st.el / TAU * 29.530589, lit = (1 - Math.cos(st.el)) / 2;
+    const wd = new Date(J2000 + today * DAY).toLocaleDateString('ja-JP', { weekday: 'short' });
+    const c = off.getContext('2d');
+    c.textAlign = 'center'; c.textBaseline = 'alphabetic';
+    c.fillStyle = '#f5b73f'; c.font = '500 64px ' + FONT; c.fillText(fmtDate(today) + '(' + wd + ')', 540, 1960);
+    c.fillStyle = '#8392af'; c.font = '400 34px ' + FONT;
+    c.fillText(phaseName(st.el / RAD) + ' ・ 月齢 ' + fmtNum(age, 1) + ' 日 ・ 明るい部分 ' + Math.round(lit * 100) + '%', 540, 2030);
+  } finally {
+    W = keep.W; H = keep.H; DPR = keep.DPR; ctx = keep.ctx; mode = keep.mode; LS = keep.LS; PS = keep.PS;
+    S.days = keep.days; S.zoom = keep.zoom; S.sel = keep.sel; S.cam.x = keep.cx; S.cam.y = keep.cy;
+    S.showAst = keep.ast; S.showLabels = keep.lbl; S.showComets = keep.com;
+    placeBodies();
+  }
+  return new Promise((res, rej) => off.toBlob(b => b ? res(b) : rej(new Error('toBlob')), 'image/png'));
+}
+$('wpSave').addEventListener('click', async () => {
+  const btn = $('wpSave'), hint = $('wpHint'), keepText = hint.textContent;
+  if (!wpDl) return;
+  btn.disabled = true; hint.textContent = '作っています…';
+  try {
+    const blob = await makeWallpaper(), d = new Date();
+    const stamp = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    await wpDl.save({ filename: 'solar-system-' + stamp + '.png', data: blob });
+    hint.textContent = '保存しました。';
+  } catch (e) {
+    hint.textContent = e && e.code === 'declined' ? '保存をやめました。' : '保存できませんでした。もう一度お試しください。';
+  } finally { btn.disabled = false; setTimeout(() => { hint.textContent = keepText; }, 4000); }
+});
+
+/* ---- 起動 ---- */
+new ResizeObserver(resize).observe(stage);
+resize(); setPlayUI(); $('speedOut').textContent = SPEEDS[S.speedIdx].t;
+update(0); syncUI(); buildInfo(); initEM();
+let last = performance.now(), infoT = 0;
+function frame(now) {
+  const dt = Math.min(0.1, (now - last) / 1000); last = now;
+  if (S.playing) S.days += S.dir * SPEEDS[S.speedIdx].d * dt;
+  update(dt); draw(); drawEM(); updateClock(); updateScale();
+  infoT += dt; if (infoT > 0.1) { infoT = 0; refreshInfo(); refreshEM(); }
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
