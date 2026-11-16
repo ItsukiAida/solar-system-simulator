@@ -132,11 +132,15 @@ output { font-family: var(--font-num); font-size: 12px; min-width: 8.5em; font-v
 .info-note:empty { display: none; }
 .em {
   position: absolute; left: 12px; bottom: 12px; width: 236px; padding: 8px 10px 10px;
-  background: rgba(12, 19, 34, 0.92); border: 1px solid var(--line); border-radius: 6px;
+  background: #0c1322; border: 2px solid rgba(245, 183, 63, 0.8); border-radius: 6px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.55);
 }
 .em[hidden] { display: none; }
-.em-head { font-size: 12px; font-weight: 700; margin-bottom: 6px; letter-spacing: 0.04em; }
-.em canvas { position: static; inset: auto; width: 100%; height: auto; aspect-ratio: 1; border-radius: 4px; cursor: default; touch-action: auto; }
+.em-head { font-size: 12px; font-weight: 700; letter-spacing: 0.14em; text-align: center; color: #f5cf7d; background: rgba(245, 183, 63, 0.16); border-bottom: 1px solid rgba(245, 183, 63, 0.45); border-radius: 4px 4px 0 0; margin: -8px -10px 8px; padding: 5px 10px; }
+.em-legend { display: flex; justify-content: center; gap: 14px; margin-top: 6px; font-size: 11px; color: var(--muted); }
+.em-legend span { display: inline-flex; align-items: center; gap: 5px; }
+.em-legend i { width: 9px; height: 9px; border-radius: 50%; background: var(--c); flex: none; }
+.em canvas { position: static; inset: auto; width: 100%; height: auto; aspect-ratio: 1; border-radius: 4px; border: 1px solid var(--line-strong); box-sizing: border-box; cursor: default; touch-action: auto; }
 .em canvas:active { cursor: default; }
 .em-cap { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
 .em-cap canvas { width: 36px; height: 36px; aspect-ratio: auto; flex: none; border-radius: 0; }
@@ -182,7 +186,8 @@ output { font-family: var(--font-num); font-size: 12px; min-width: 8.5em; font-v
   .controls .speed { flex-basis: 150px; }
   .controls .speed label { display: none; }
   .controls output { min-width: 5em; }
-  .em { left: auto; right: 8px; top: 8px; bottom: auto; width: 150px; padding: 6px 8px 8px; }
+  .em { left: 8px; right: auto; top: auto; bottom: 60px; width: 150px; padding: 6px 8px 8px; }
+  .em-head { margin: -6px -8px 6px; padding: 4px 8px; }
   .em-note, .em-age { display: none; }
   .em-cap { margin-top: 4px; gap: 6px; }
   input[type="range"] { flex: 1; min-width: 100px; }
@@ -216,8 +221,9 @@ output { font-family: var(--font-num); font-size: 12px; min-width: 8.5em; font-v
       </div>
     </aside>
     <section id="em" class="em" hidden aria-label="太陽・地球・月の拡大図">
-      <div class="em-head">太陽・地球・月(拡大図)</div>
+      <div class="em-head">拡大図</div>
       <canvas id="emView" width="216" height="216"></canvas>
+      <div class="em-legend"><span><i style="--c:#f5b73f"></i>太陽</span><span><i style="--c:#e8e4d4"></i>月</span><span><i style="--c:#4f9bd9"></i>地球</span></div>
       <div class="em-cap">
         <canvas id="phaseIcon" width="36" height="36"></canvas>
         <div><div id="emPhase" class="em-phase"></div><div id="emAge" class="em-age"></div></div>
@@ -230,8 +236,8 @@ output { font-family: var(--font-num); font-size: 12px; min-width: 8.5em; font-v
     <button id="play" class="btn" type="button"></button>
     <div class="grp speed">
       <label for="speed">速さ</label>
-      <input id="speed" type="range" min="0" max="6" step="1" value="2" aria-label="速さ">
-      <output id="speedOut" for="speed">1か月/秒</output>
+      <input id="speed" type="range" min="0" max="6" step="1" value="0" aria-label="速さ">
+      <output id="speedOut" for="speed">1日/秒</output>
     </div>
     <button id="home" class="btn" type="button" aria-label="全体表示" title="全体表示">全体</button>
     <button id="settingsBtn" class="btn" type="button" aria-expanded="false" aria-controls="settings">設定</button>
@@ -381,7 +387,7 @@ const SPEEDS = [
   { d: 365.25, t: '1年/秒' }, { d: 1826, t: '5年/秒' }, { d: 3652.5, t: '10年/秒' }
 ];
 const S = {
-  days: (Date.now() - J2000) / DAY, nowDays: 0, dir: 1, speedIdx: 2,
+  days: (Date.now() - J2000) / DAY, nowDays: 0, dir: 1, speedIdx: 0,
   playing: !matchMedia('(prefers-reduced-motion: reduce)').matches,
   sel: byId('earth'), follow: false, zoom: 1, zoomGoal: 1, cam: { x: 0, y: 0 }, camGoal: { x: 0, y: 0 },
   blend: 0, showAst: true, showLabels: true, showComets: true, inited: false, fitPrev: 0
@@ -810,7 +816,7 @@ function drawPhase(c, x, y, R, el) {
 function drawEM() {
   if (emBox.hidden || !EW) return;
   const c = emCtx, s = EW, cx = s / 2, cy = s / 2, st = moonState();
-  const er = s * 0.085, mr = er * 0.2725, mo = s * 0.30, sd = s * 0.43, sr = s * 0.05;
+  const er = s * 0.085, mr = er * 0.2725, mo = s * 0.30, sd = s * 0.40, sr = s * 0.05;
   c.fillStyle = '#050912'; c.fillRect(0, 0, s, s);
   const sx = cx + sd * Math.cos(st.sunAng), sy = cy - sd * Math.sin(st.sunAng);
   const g = c.createRadialGradient(sx, sy, 0, sx, sy, sr * 3);
@@ -831,10 +837,6 @@ function drawEM() {
   litDisc(c, cx, cy, er, st.sunAng, '#14283f', '#4f9bd9');
   const mx = cx + mo * Math.cos(st.mAng), my = cy - mo * Math.sin(st.mAng);
   litDisc(c, mx, my, mr, st.sunAng, '#2b303b', '#e8e4d4');
-  c.font = '400 ' + Math.round(s * 0.052) + 'px ' + FONT; c.fillStyle = 'rgba(226,233,246,0.9)';
-  c.fillText('太陽', sx - (sr + s * 0.045) * Math.cos(st.sunAng), sy + (sr + s * 0.045) * Math.sin(st.sunAng));
-  c.fillText('月', mx + (mr + s * 0.04) * Math.cos(st.mAng), my - (mr + s * 0.04) * Math.sin(st.mAng));
-  c.fillText('地球', cx, cy + er + s * 0.045);
 }
 function refreshEM() {
   if (emBox.hidden) return;
